@@ -17,10 +17,11 @@ import (
 )
 
 const (
-	DbusExitCodeKey    = "ExecMainStatus"
-	DbusStartedAtKey   = "ExecMainStartTimestamp"
-	DbusFinishedAtKey  = "ExecMainExitTimestamp"
-	DbusContainerIDKey = "MainPID"
+	DbusExitCodeKey     = "ExecMainStatus"
+	DbusStartedAtKey    = "ExecMainStartTimestamp"
+	DbusFinishedAtKey   = "ExecMainExitTimestamp"
+	DbusContainerIDKey  = "MainPID"
+	DbusRestartCountKey = "NRestarts"
 
 	DbusTerminatedStop   = "stop"
 	DbusTerminatedFailed = "failed"
@@ -37,9 +38,9 @@ const (
 )
 
 type DbusProperties struct {
-	exitCode              int32
-	startedAt, finishedAt meta.Time
-	containerID           *url.URL
+	exitCode, restartCount int32
+	startedAt, finishedAt  meta.Time
+	containerID            *url.URL
 }
 
 func (p *DbusProperties) ExitCode() int32       { return p.exitCode }
@@ -48,32 +49,37 @@ func (p *DbusProperties) FinishedAt() meta.Time { return p.finishedAt }
 func (p *DbusProperties) ContainerID() *url.URL { return p.containerID }
 
 func (s *DbusState) Properties(ctx context.Context, name units.UnitName) (units.Properties, error) {
-	exitCode, err := s.getExitCode(ctx, name)
+	exitCode, err := s.getPropertyInt(ctx, name, DbusExitCodeKey)
 	if err != nil {
 		return nil, err
 	}
-	startedAt, err := s.getTimeProperty(ctx, name, DbusStartedAtKey)
+	restartCount, err := s.getPropertyInt(ctx, name, DbusRestartCountKey)
 	if err != nil {
 		return nil, err
 	}
-	finishedAt, err := s.getTimeProperty(ctx, name, DbusFinishedAtKey)
+	startedAt, err := s.getPropertyTime(ctx, name, DbusStartedAtKey)
 	if err != nil {
 		return nil, err
 	}
-	containerID, err := s.getContainerID(ctx, name)
+	finishedAt, err := s.getPropertyTime(ctx, name, DbusFinishedAtKey)
+	if err != nil {
+		return nil, err
+	}
+	containerID, err := s.getPropertyURL(ctx, name, DbusContainerIDKey)
 	if err != nil {
 		return nil, err
 	}
 	return &DbusProperties{
-		exitCode:    exitCode,
-		startedAt:   startedAt,
-		finishedAt:  finishedAt,
-		containerID: containerID,
+		exitCode:     int32(exitCode),
+		restartCount: int32(restartCount),
+		startedAt:    startedAt,
+		finishedAt:   finishedAt,
+		containerID:  containerID,
 	}, nil
 }
 
-func (s *DbusState) getExitCode(ctx context.Context, name units.UnitName) (int32, error) {
-	p, err := s.c.GetServicePropertyContext(ctx, string(name), DbusExitCodeKey)
+func (s *DbusState) getPropertyInt(ctx context.Context, name units.UnitName, key string) (int64, error) {
+	p, err := s.c.GetServicePropertyContext(ctx, string(name), key)
 	if err != nil {
 		return 0, err
 	}
@@ -81,20 +87,19 @@ func (s *DbusState) getExitCode(ctx context.Context, name units.UnitName) (int32
 	if err != nil {
 		return -1, nil
 	}
-	return int32(n), nil
+	return n, nil
 }
 
-func (s *DbusState) getTimeProperty(ctx context.Context, name units.UnitName, key string) (meta.Time, error) {
+func (s *DbusState) getPropertyTime(ctx context.Context, name units.UnitName, key string) (meta.Time, error) {
 	p, err := s.c.GetServicePropertyContext(ctx, string(name), key)
 	if err != nil {
 		return meta.Time{}, err
 	}
-	t, _ := parseTimestampMilli(propValue(p))
-	return meta.NewTime(t), nil
+	return meta.NewTime(parseTimestampMilli(propValue(p))), nil
 }
 
-func (s *DbusState) getContainerID(ctx context.Context, name units.UnitName) (*url.URL, error) {
-	p, err := s.c.GetServicePropertyContext(ctx, string(name), DbusContainerIDKey)
+func (s *DbusState) getPropertyURL(ctx context.Context, name units.UnitName, key string) (*url.URL, error) {
+	p, err := s.c.GetServicePropertyContext(ctx, string(name), key)
 	if err != nil {
 		return nil, err
 	}
@@ -103,9 +108,9 @@ func (s *DbusState) getContainerID(ctx context.Context, name units.UnitName) (*u
 
 func propValue(p *dbus.Property) string { return fmt.Sprintf("%v", p.Value.Value()) }
 
-func parseTimestampMilli(s string) (time.Time, error) {
+func parseTimestampMilli(s string) time.Time {
 	ms, _ := strconv.ParseInt(s, 10, 64)
-	return time.UnixMilli(ms), nil
+	return time.UnixMilli(ms)
 }
 
 func (s *DbusState) toContainerState(props units.Properties, subState string) (ret core.ContainerState) {
