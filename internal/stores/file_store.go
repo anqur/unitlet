@@ -27,7 +27,7 @@ func (s *FileStore) CreateUnits(ctx context.Context, us []*units.Unit) error {
 	return s.writeUnits(ctx, us, false)
 }
 
-func (s *FileStore) DeleteUnit(_ context.Context, name units.UnitName) error {
+func (s *FileStore) DeleteUnit(_ context.Context, name units.Name) error {
 	return os.Remove(s.filepath(name))
 }
 
@@ -35,7 +35,7 @@ func (s *FileStore) UpdateUnits(ctx context.Context, us []*units.Unit) error {
 	return s.writeUnits(ctx, us, true)
 }
 
-func (s *FileStore) filepath(name units.UnitName) string {
+func (s *FileStore) filepath(name units.Name) string {
 	return filepath.Join(s.path, string(name))
 }
 

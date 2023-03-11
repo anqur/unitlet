@@ -14,22 +14,25 @@ import (
 )
 
 const (
-	UnitPrefix = "unitlet"
-	UnitSuffix = ".service"
+	Prefix = "unitlet"
+	Suffix = ".service"
 )
 
-type UnitID struct {
+type ID struct {
 	ns, p, c string
 }
 
-func NewUnitID(namespace, pod, container string) *UnitID {
-	return &UnitID{namespace, pod, container}
+func NewID(namespace, pod, container string) *ID {
+	return &ID{namespace, pod, container}
 }
 
-func (i *UnitID) String() string { return strings.Join([]string{UnitPrefix, i.ns, i.p, i.c}, ".") }
-func (i *UnitID) Name() UnitName { return UnitName(i.String() + UnitSuffix) }
+func (i *ID) Namespace() string { return i.ns }
+func (i *ID) Pod() string       { return i.p }
+func (i *ID) Container() string { return i.c }
+func (i *ID) String() string    { return strings.Join([]string{Prefix, i.ns, i.p, i.c}, ".") }
+func (i *ID) Name() Name        { return Name(i.String() + Suffix) }
 
-type UnitName string
+type Name string
 
 const (
 	ServiceSection = "Service"
@@ -44,7 +47,7 @@ const (
 )
 
 type Unit struct {
-	ID  *UnitID
+	ID  *ID
 	Cmd []string
 
 	Workdir *string
@@ -65,7 +68,7 @@ func FromPod(p *core.Pod) (ret []*Unit) {
 		}
 
 		ret = append(ret, &Unit{
-			ID:  NewUnitID(p.Namespace, p.Name, c.Name),
+			ID:  NewID(p.Namespace, p.Name, c.Name),
 			Cmd: append(c.Command, c.Args...),
 
 			Workdir: wd,
@@ -123,7 +126,7 @@ func (u *Unit) MarshalUnitSections() []*unit.UnitSection {
 }
 
 func (u *Unit) UnmarshalUnitSections(ss []*unit.UnitSection) error {
-	u.ID = new(UnitID)
+	u.ID = new(ID)
 	for _, s := range ss {
 		for _, e := range s.Entries {
 			switch s.Section {

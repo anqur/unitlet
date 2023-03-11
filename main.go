@@ -9,7 +9,7 @@ import (
 	"github.com/anqur/unitlet/pkg/units"
 )
 
-const ProviderName = units.UnitPrefix
+const ProviderName = units.Prefix
 
 var (
 	NewFileStore = stores.NewFileStore

@@ -99,7 +99,7 @@ func (l *Unitlet) RunInContainer(context.Context, string, string, string, []stri
 
 func (l *Unitlet) ConfigureNode(context.Context, *v1.Node) {}
 
-func (l *Unitlet) forceUnload(ctx context.Context, name units.UnitName) {
+func (l *Unitlet) forceUnload(ctx context.Context, name units.Name) {
 	_ = l.state.Disable(ctx, name)
 	_ = l.state.ResetFailed(ctx, name)
 	_ = l.store.DeleteUnit(ctx, name)

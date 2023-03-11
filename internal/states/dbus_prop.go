@@ -44,11 +44,12 @@ type DbusProperties struct {
 }
 
 func (p *DbusProperties) ExitCode() int32       { return p.exitCode }
+func (p *DbusProperties) RestartCount() int32   { return p.restartCount }
 func (p *DbusProperties) StartedAt() meta.Time  { return p.startedAt }
 func (p *DbusProperties) FinishedAt() meta.Time { return p.finishedAt }
 func (p *DbusProperties) ContainerID() *url.URL { return p.containerID }
 
-func (s *DbusState) Properties(ctx context.Context, name units.UnitName) (units.Properties, error) {
+func (s *DbusState) Properties(ctx context.Context, name units.Name) (units.Properties, error) {
 	exitCode, err := s.getPropertyInt(ctx, name, DbusExitCodeKey)
 	if err != nil {
 		return nil, err
@@ -78,7 +79,7 @@ func (s *DbusState) Properties(ctx context.Context, name units.UnitName) (units.
 	}, nil
 }
 
-func (s *DbusState) getPropertyInt(ctx context.Context, name units.UnitName, key string) (int64, error) {
+func (s *DbusState) getPropertyInt(ctx context.Context, name units.Name, key string) (int64, error) {
 	p, err := s.c.GetServicePropertyContext(ctx, string(name), key)
 	if err != nil {
 		return 0, err
@@ -90,7 +91,7 @@ func (s *DbusState) getPropertyInt(ctx context.Context, name units.UnitName, key
 	return n, nil
 }
 
-func (s *DbusState) getPropertyTime(ctx context.Context, name units.UnitName, key string) (meta.Time, error) {
+func (s *DbusState) getPropertyTime(ctx context.Context, name units.Name, key string) (meta.Time, error) {
 	p, err := s.c.GetServicePropertyContext(ctx, string(name), key)
 	if err != nil {
 		return meta.Time{}, err
@@ -98,7 +99,7 @@ func (s *DbusState) getPropertyTime(ctx context.Context, name units.UnitName, ke
 	return meta.NewTime(parseTimestampMilli(propValue(p))), nil
 }
 
-func (s *DbusState) getPropertyURL(ctx context.Context, name units.UnitName, key string) (*url.URL, error) {
+func (s *DbusState) getPropertyURL(ctx context.Context, name units.Name, key string) (*url.URL, error) {
 	p, err := s.c.GetServicePropertyContext(ctx, string(name), key)
 	if err != nil {
 		return nil, err
@@ -113,7 +114,19 @@ func parseTimestampMilli(s string) time.Time {
 	return time.UnixMilli(ms)
 }
 
-func (s *DbusState) toContainerState(props units.Properties, subState string) (ret core.ContainerState) {
+func (s *DbusState) toContainerStatus(props units.Properties, u *units.Unit, us *dbus.UnitStatus) core.ContainerStatus {
+	state := s.toContainerState(props, us.SubState)
+	return core.ContainerStatus{
+		Name:                 u.ID.Container(),
+		State:                state,
+		LastTerminationState: state,
+		Ready:                true,
+		RestartCount:         props.RestartCount(),
+		ContainerID:          props.ContainerID().String(),
+	}
+}
+
+func (*DbusState) toContainerState(props units.Properties, subState string) (ret core.ContainerState) {
 	if strings.HasPrefix(subState, DbusTerminatedStop) ||
 		subState == DbusTerminatedFailed ||
 		subState == DbusTerminatedExited ||

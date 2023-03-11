@@ -29,7 +29,7 @@ func NewDbusState() (units.State, error) {
 	return &DbusState{c}, nil
 }
 
-func (s *DbusState) Enable(ctx context.Context, name units.UnitName) error {
+func (s *DbusState) Enable(ctx context.Context, name units.Name) error {
 	ok, _, err := s.c.EnableUnitFilesContext(ctx, []string{string(name)}, true, true)
 	if err != nil {
 		return err
@@ -40,37 +40,37 @@ func (s *DbusState) Enable(ctx context.Context, name units.UnitName) error {
 	return nil
 }
 
-func (s *DbusState) Disable(ctx context.Context, name units.UnitName) error {
+func (s *DbusState) Disable(ctx context.Context, name units.Name) error {
 	_, err := s.c.DisableUnitFilesContext(ctx, []string{string(name)}, true)
 	return err
 }
 
-func (s *DbusState) Start(ctx context.Context, name units.UnitName) error {
+func (s *DbusState) Start(ctx context.Context, name units.Name) error {
 	_, err := s.c.StartUnitContext(ctx, string(name), DbusModeReplace, nil)
 	return err
 }
 
-func (s *DbusState) Stop(ctx context.Context, name units.UnitName) error {
+func (s *DbusState) Stop(ctx context.Context, name units.Name) error {
 	_, err := s.c.StopUnitContext(ctx, string(name), DbusModeReplace, nil)
 	return err
 }
 
 func (s *DbusState) Reload(ctx context.Context) error { return s.c.ReloadContext(ctx) }
 
-func (s *DbusState) ResetFailed(ctx context.Context, name units.UnitName) error {
+func (s *DbusState) ResetFailed(ctx context.Context, name units.Name) error {
 	return s.c.ResetFailedUnitContext(ctx, string(name))
 }
 
-func (s *DbusState) List(ctx context.Context) (map[units.UnitName]*core.Pod, error) {
+func (s *DbusState) List(ctx context.Context) (map[units.Name]*core.Pod, error) {
 	us, err := s.c.ListUnitsContext(ctx)
 	if err != nil {
 		return nil, err
 	}
 	for _, u := range us {
-		if !strings.HasPrefix(u.Name, units.UnitPrefix) {
+		if !strings.HasPrefix(u.Name, units.Prefix) {
 			continue
 		}
-		if !strings.HasSuffix(u.Name, units.UnitSuffix) {
+		if !strings.HasSuffix(u.Name, units.Suffix) {
 			continue
 		}
 		// TODO
@@ -78,7 +78,7 @@ func (s *DbusState) List(ctx context.Context) (map[units.UnitName]*core.Pod, err
 	return nil, nil
 }
 
-func (s *DbusState) Get(ctx context.Context, name units.UnitName) (*core.Pod, error) {
+func (s *DbusState) Get(ctx context.Context, name units.Name) (*core.Pod, error) {
 	m, err := s.List(ctx)
 	if err != nil {
 		return nil, err

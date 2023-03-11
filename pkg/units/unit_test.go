@@ -8,7 +8,7 @@ func TestUnitEncoding(t *testing.T) {
 	wd := "/tmp"
 	user := int64(42)
 	u := &Unit{
-		ID:      NewUnitID("a", "b", "c"),
+		ID:      NewID("a", "b", "c"),
 		Cmd:     []string{"echo", "hello"},
 		Workdir: &wd,
 		User:    &user,
