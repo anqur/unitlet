@@ -15,24 +15,29 @@ import (
 
 type Unitlet struct {
 	mu    sync.RWMutex
+	cfg   *provider.InitConfig
 	store units.Store
 	state units.State
 }
 
-func NewUnitlet(store units.Store, state units.State) provider.Provider {
-	return &Unitlet{store: store, state: state}
+func NewUnitlet(cfg *provider.InitConfig, store units.Store, state units.State) provider.Provider {
+	return &Unitlet{cfg: cfg, store: store, state: state}
 }
 
 func (l *Unitlet) CreatePod(ctx context.Context, pod *v1.Pod) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	us := units.FromPod(pod)
+	us := units.From(&pod.ObjectMeta, &pod.Spec)
 	if err := l.store.CreateUnits(ctx, us); err != nil {
 		return err
 	}
 	for _, u := range us {
 		name := u.ID.Name()
+		if err := l.state.Link(ctx, l.store.Location(name)); err != nil {
+			l.forceUnload(ctx, name)
+			return err
+		}
 		if err := l.state.Enable(ctx, name); err != nil {
 			l.forceUnload(ctx, name)
 			return err
@@ -50,7 +55,7 @@ func (l *Unitlet) DeletePod(ctx context.Context, pod *v1.Pod) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	for _, u := range units.FromPod(pod) {
+	for _, u := range units.From(&pod.ObjectMeta, &pod.Spec) {
 		name := u.ID.Name()
 		if err := l.state.Stop(ctx, name); err != nil {
 			continue
@@ -72,6 +77,8 @@ func (l *Unitlet) GetPod(ctx context.Context, namespace, name string) (*v1.Pod, 
 func (l *Unitlet) GetPodStatus(ctx context.Context, namespace, name string) (*v1.PodStatus, error) {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
+
+	// TODO: It looks up on namespace and name, so how?
 
 	//TODO implement me
 	panic("implement me")

@@ -16,8 +16,8 @@ var (
 	NewDbusState = states.NewDbusState
 )
 
-func New(provider.InitConfig) (provider.Provider, error) {
-	store, err := NewFileStore(stores.DefaultUnitFileStorePath)
+func New(cfg provider.InitConfig) (provider.Provider, error) {
+	store, err := NewFileStore(stores.DefaultFileStorePath)
 	if err != nil {
 		return nil, err
 	}
@@ -27,5 +27,5 @@ func New(provider.InitConfig) (provider.Provider, error) {
 		return nil, err
 	}
 
-	return providers.NewUnitlet(store, state), nil
+	return providers.NewUnitlet(&cfg, store, state), nil
 }

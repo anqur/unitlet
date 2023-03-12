@@ -10,7 +10,7 @@ import (
 	"github.com/anqur/unitlet/pkg/units"
 )
 
-const DefaultUnitFileStorePath = "/opt/unitlet/units"
+const DefaultFileStorePath = "/opt/unitlet/units"
 
 type FileStore struct {
 	path string
@@ -21,6 +21,19 @@ func NewFileStore(path string) (units.Store, error) {
 		return nil, err
 	}
 	return &FileStore{path}, nil
+}
+
+func (s *FileStore) Location(name units.Name) units.Location {
+	return units.Location(filepath.Join(DefaultFileStorePath, string(name)))
+}
+
+func (s *FileStore) GetUnit(_ context.Context, name units.Name) (*units.Unit, error) {
+	data, err := os.ReadFile(s.filepath(name))
+	if err != nil {
+		return nil, err
+	}
+	ret := new(units.Unit)
+	return ret, ret.Unmarshal(data)
 }
 
 func (s *FileStore) CreateUnits(ctx context.Context, us []*units.Unit) error {

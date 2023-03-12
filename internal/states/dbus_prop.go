@@ -114,23 +114,11 @@ func parseTimestampMilli(s string) time.Time {
 	return time.UnixMilli(ms)
 }
 
-func (s *DbusState) toContainerStatus(props units.Properties, u *units.Unit, us *dbus.UnitStatus) core.ContainerStatus {
-	state := s.toContainerState(props, us.SubState)
-	return core.ContainerStatus{
-		Name:                 u.ID.Container(),
-		State:                state,
-		LastTerminationState: state,
-		Ready:                true,
-		RestartCount:         props.RestartCount(),
-		ContainerID:          props.ContainerID().String(),
-	}
-}
-
-func (*DbusState) toContainerState(props units.Properties, subState string) (ret core.ContainerState) {
-	if strings.HasPrefix(subState, DbusTerminatedStop) ||
-		subState == DbusTerminatedFailed ||
-		subState == DbusTerminatedExited ||
-		(subState == DbusTerminatedDead && !props.FinishedAt().IsZero()) {
+func fromSubState(ss string, props units.Properties) (ret core.ContainerState) {
+	if strings.HasPrefix(ss, DbusTerminatedStop) ||
+		ss == DbusTerminatedFailed ||
+		ss == DbusTerminatedExited ||
+		(ss == DbusTerminatedDead && !props.FinishedAt().IsZero()) {
 		reason := string(core.PodSucceeded)
 		if props.ExitCode() != 0 {
 			reason = string(core.PodFailed)
@@ -146,20 +134,20 @@ func (*DbusState) toContainerState(props units.Properties, subState string) (ret
 		return
 	}
 
-	if strings.HasPrefix(subState, DbusWaitingStart) ||
-		subState == DbusWaitingCondition ||
-		subState == DbusWaitingDead {
-		ret.Waiting = &core.ContainerStateWaiting{Reason: subState, Message: subState}
+	if strings.HasPrefix(ss, DbusWaitingStart) ||
+		ss == DbusWaitingCondition ||
+		ss == DbusWaitingDead {
+		ret.Waiting = &core.ContainerStateWaiting{Reason: ss, Message: ss}
 		return
 	}
 
-	if subState == DbusRunning ||
-		subState == DbusRunningAutoRestart ||
-		subState == DbusRunningReload {
+	if ss == DbusRunning ||
+		ss == DbusRunningAutoRestart ||
+		ss == DbusRunningReload {
 		ret.Running = &core.ContainerStateRunning{StartedAt: props.StartedAt()}
 		return
 	}
 
-	log.L.Warnf("unknown sub-state %q", subState)
+	log.L.Warnf("unknown dbus sub-state %q", ss)
 	return
 }

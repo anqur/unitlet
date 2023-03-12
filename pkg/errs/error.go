@@ -11,6 +11,7 @@ var (
 	ErrNotSupported = wrap("not supported")
 
 	ErrBadUnitFile = wrap("not a Pod-compatible unit file")
+	ErrBadUnitID   = wrap("invalid unit ID")
 
 	ErrUnitFileExists  = wrap("unit file already exists")
 	ErrMarshalUnitFile = wrap("unit file marshal error")

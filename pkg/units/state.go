@@ -10,6 +10,7 @@ import (
 
 type (
 	State interface {
+		Link(ctx context.Context, loc Location) error
 		Enable(ctx context.Context, name Name) error
 		Disable(ctx context.Context, name Name) error
 		Start(ctx context.Context, name Name) error
@@ -17,8 +18,8 @@ type (
 		Reload(ctx context.Context) error
 		ResetFailed(ctx context.Context, name Name) error
 
-		List(ctx context.Context) (map[Name]*core.Pod, error)
-		Get(ctx context.Context, name Name) (*core.Pod, error)
+		List(ctx context.Context) (map[Name]*core.PodStatus, error)
+		Get(ctx context.Context, name Name) (*core.PodStatus, error)
 		Properties(ctx context.Context, name Name) (Properties, error)
 	}
 

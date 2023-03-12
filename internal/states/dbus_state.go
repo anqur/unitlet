@@ -29,6 +29,11 @@ func NewDbusState() (units.State, error) {
 	return &DbusState{c}, nil
 }
 
+func (s *DbusState) Link(ctx context.Context, loc units.Location) error {
+	_, err := s.c.LinkUnitFilesContext(ctx, []string{string(loc)}, true, true)
+	return err
+}
+
 func (s *DbusState) Enable(ctx context.Context, name units.Name) error {
 	ok, _, err := s.c.EnableUnitFilesContext(ctx, []string{string(name)}, true, true)
 	if err != nil {
@@ -61,11 +66,41 @@ func (s *DbusState) ResetFailed(ctx context.Context, name units.Name) error {
 	return s.c.ResetFailedUnitContext(ctx, string(name))
 }
 
-func (s *DbusState) List(ctx context.Context) (map[units.Name]*core.Pod, error) {
+func (s *DbusState) List(ctx context.Context) (map[units.Name]*core.PodStatus, error) {
+	infos, err := s.listUnits(ctx)
+	if err != nil {
+		return nil, err
+	}
+	ret := make(map[units.Name]*core.PodStatus)
+	for name, info := range infos {
+		phase := units.ReduceContainerStatuses(info.statuses)
+		startedAt := info.props.StartedAt()
+		ret[name] = &core.PodStatus{
+			Phase: phase,
+			Conditions: []core.PodCondition{
+				{Type: core.PodReady, Status: core.ConditionTrue, LastTransitionTime: startedAt},
+				{Type: core.PodInitialized, Status: core.ConditionTrue, LastTransitionTime: startedAt},
+				{Type: core.PodScheduled, Status: core.ConditionTrue, LastTransitionTime: startedAt},
+			},
+			Message:   string(phase),
+			StartTime: &startedAt,
+		}
+	}
+	return ret, nil
+}
+
+type unitInfo struct {
+	props    units.Properties
+	statuses []core.ContainerStatus
+}
+
+func (s *DbusState) listUnits(ctx context.Context) (map[units.Name]*unitInfo, error) {
 	us, err := s.c.ListUnitsContext(ctx)
 	if err != nil {
 		return nil, err
 	}
+
+	unitInfos := make(map[units.Name]*unitInfo)
 	for _, u := range us {
 		if !strings.HasPrefix(u.Name, units.Prefix) {
 			continue
@@ -73,18 +108,38 @@ func (s *DbusState) List(ctx context.Context) (map[units.Name]*core.Pod, error) 
 		if !strings.HasSuffix(u.Name, units.Suffix) {
 			continue
 		}
-		// TODO
+
+		name := units.Name(u.Name)
+		id, err := units.ParseName(name)
+		if err != nil {
+			return nil, err
+		}
+		props, err := s.Properties(ctx, name)
+		if err != nil {
+			return nil, err
+		}
+
+		state := fromSubState(u.SubState, props)
+		status := units.ToContainerStatus(id.Container(), props, state)
+
+		info, ok := unitInfos[name]
+		if !ok {
+			info = &unitInfo{props: props}
+			unitInfos[name] = info
+		}
+		info.statuses = append(info.statuses, status)
 	}
-	return nil, nil
+
+	return unitInfos, nil
 }
 
-func (s *DbusState) Get(ctx context.Context, name units.Name) (*core.Pod, error) {
+func (s *DbusState) Get(ctx context.Context, name units.Name) (*core.PodStatus, error) {
 	m, err := s.List(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if info, ok := m[name]; ok {
-		return info, nil
+	if status, ok := m[name]; ok {
+		return status, nil
 	}
 	return nil, errdefs.NotFound(string(name))
 }
