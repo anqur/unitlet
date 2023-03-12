@@ -15,6 +15,7 @@ Todos:
 
 * [ ] Fetching container logs
 * [ ] Exposing metrics
+* [ ] Ah yes, haven't tested all of these yet xD
 
 ## License
 
