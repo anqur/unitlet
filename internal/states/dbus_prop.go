@@ -114,11 +114,11 @@ func parseTimestampMilli(s string) time.Time {
 	return time.UnixMilli(ms)
 }
 
-func fromSubState(ss string, props units.Properties) (ret core.ContainerState) {
-	if strings.HasPrefix(ss, DbusTerminatedStop) ||
-		ss == DbusTerminatedFailed ||
-		ss == DbusTerminatedExited ||
-		(ss == DbusTerminatedDead && !props.FinishedAt().IsZero()) {
+func toContainerState(subState string, props units.Properties) (ret core.ContainerState) {
+	if strings.HasPrefix(subState, DbusTerminatedStop) ||
+		subState == DbusTerminatedFailed ||
+		subState == DbusTerminatedExited ||
+		(subState == DbusTerminatedDead && !props.FinishedAt().IsZero()) {
 		reason := string(core.PodSucceeded)
 		if props.ExitCode() != 0 {
 			reason = string(core.PodFailed)
@@ -134,20 +134,20 @@ func fromSubState(ss string, props units.Properties) (ret core.ContainerState) {
 		return
 	}
 
-	if strings.HasPrefix(ss, DbusWaitingStart) ||
-		ss == DbusWaitingCondition ||
-		ss == DbusWaitingDead {
-		ret.Waiting = &core.ContainerStateWaiting{Reason: ss, Message: ss}
+	if strings.HasPrefix(subState, DbusWaitingStart) ||
+		subState == DbusWaitingCondition ||
+		subState == DbusWaitingDead {
+		ret.Waiting = &core.ContainerStateWaiting{Reason: subState, Message: subState}
 		return
 	}
 
-	if ss == DbusRunning ||
-		ss == DbusRunningAutoRestart ||
-		ss == DbusRunningReload {
+	if subState == DbusRunning ||
+		subState == DbusRunningAutoRestart ||
+		subState == DbusRunningReload {
 		ret.Running = &core.ContainerStateRunning{StartedAt: props.StartedAt()}
 		return
 	}
 
-	log.L.Warnf("unknown dbus sub-state %q", ss)
+	log.L.Warnf("unknown dbus sub-state %q", subState)
 	return
 }

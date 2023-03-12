@@ -11,16 +11,25 @@ import (
 type (
 	State interface {
 		Link(ctx context.Context, loc Location) error
+
 		Enable(ctx context.Context, name Name) error
 		Disable(ctx context.Context, name Name) error
+
 		Start(ctx context.Context, name Name) error
 		Stop(ctx context.Context, name Name) error
+
 		Reload(ctx context.Context) error
 		ResetFailed(ctx context.Context, name Name) error
 
-		List(ctx context.Context) (map[Name]*core.PodStatus, error)
-		Get(ctx context.Context, name Name) (*core.PodStatus, error)
+		Views(ctx context.Context) (Views, error)
 		Properties(ctx context.Context, name Name) (Properties, error)
+	}
+
+	Views = map[string]map[string]*View
+	View  struct {
+		Lead   Name
+		Names  []Name
+		Status *core.PodStatus
 	}
 
 	Properties interface {

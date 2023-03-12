@@ -1,12 +1,11 @@
 package units
 
 import (
-	"github.com/virtual-kubelet/node-cli/provider"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func From(om *meta.ObjectMeta, spec *core.PodSpec) (ret []*Unit) {
+func FromPod(om *meta.ObjectMeta, spec *core.PodSpec) (ret []*Unit) {
 	for _, c := range spec.Containers {
 		var (
 			wd   *string
@@ -31,12 +30,17 @@ func From(om *meta.ObjectMeta, spec *core.PodSpec) (ret []*Unit) {
 	return
 }
 
-func (u *Unit) AsPod(cfg *provider.InitConfig) (meta.ObjectMeta, core.PodSpec) {
-	return meta.ObjectMeta{
-		Name:      u.ID.Pod(),
-		Namespace: u.ID.Namespace(),
-		UID:       u.PodUID,
-	}, core.PodSpec{NodeName: cfg.NodeName}
+func (u *Unit) ToPod(nodeName string, cs []core.Container, status *core.PodStatus) *core.Pod {
+	return &core.Pod{
+		TypeMeta: meta.TypeMeta{Kind: "Pod", APIVersion: "v1"},
+		ObjectMeta: meta.ObjectMeta{
+			Name:      u.ID.Pod(),
+			Namespace: u.ID.Namespace(),
+			UID:       u.PodUID,
+		},
+		Spec:   core.PodSpec{NodeName: nodeName, Containers: cs},
+		Status: *status,
+	}
 }
 
 func (u *Unit) ToContainer() (ret core.Container) {

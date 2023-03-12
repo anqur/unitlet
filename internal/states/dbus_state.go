@@ -7,7 +7,6 @@ import (
 
 	"github.com/coreos/go-systemd/v22/dbus"
 	"github.com/coreos/go-systemd/v22/util"
-	"github.com/virtual-kubelet/virtual-kubelet/errdefs"
 	core "k8s.io/api/core/v1"
 
 	"github.com/anqur/unitlet/pkg/errs"
@@ -66,41 +65,68 @@ func (s *DbusState) ResetFailed(ctx context.Context, name units.Name) error {
 	return s.c.ResetFailedUnitContext(ctx, string(name))
 }
 
-func (s *DbusState) List(ctx context.Context) (map[units.Name]*core.PodStatus, error) {
+func (s *DbusState) Views(ctx context.Context) (units.Views, error) {
 	infos, err := s.listUnits(ctx)
 	if err != nil {
 		return nil, err
 	}
-	ret := make(map[units.Name]*core.PodStatus)
-	for name, info := range infos {
-		phase := units.ReduceContainerStatuses(info.statuses)
-		startedAt := info.props.StartedAt()
-		ret[name] = &core.PodStatus{
-			Phase: phase,
-			Conditions: []core.PodCondition{
-				{Type: core.PodReady, Status: core.ConditionTrue, LastTransitionTime: startedAt},
-				{Type: core.PodInitialized, Status: core.ConditionTrue, LastTransitionTime: startedAt},
-				{Type: core.PodScheduled, Status: core.ConditionTrue, LastTransitionTime: startedAt},
-			},
-			Message:   string(phase),
-			StartTime: &startedAt,
+
+	namespaces := make(units.Views)
+	for _, info := range infos {
+		ns := info.id.Namespace()
+		pod := info.id.Pod()
+		name := info.id.Name()
+		var (
+			ok   bool
+			pods map[string]*units.View
+			view *units.View
+		)
+		if pods, ok = namespaces[ns]; !ok {
+			pods = make(map[string]*units.View)
+			namespaces[ns] = pods
+		}
+		if view, ok = pods[pod]; !ok {
+			startedAt := info.props.StartedAt()
+			view = &units.View{
+				Lead: name,
+				Status: &core.PodStatus{
+					Conditions: []core.PodCondition{
+						{Type: core.PodReady, Status: core.ConditionTrue, LastTransitionTime: startedAt},
+						{Type: core.PodInitialized, Status: core.ConditionTrue, LastTransitionTime: startedAt},
+						{Type: core.PodScheduled, Status: core.ConditionTrue, LastTransitionTime: startedAt},
+					},
+				},
+			}
+			pods[pod] = view
+		}
+		view.Names = append(view.Names, name)
+		view.Status.ContainerStatuses = append(view.Status.ContainerStatuses, info.status)
+	}
+
+	for _, pods := range namespaces {
+		for _, view := range pods {
+			phase := units.ReduceContainerStatuses(view.Status.ContainerStatuses)
+			view.Status.Phase = phase
+			view.Status.Message = string(phase)
 		}
 	}
-	return ret, nil
+
+	return namespaces, nil
 }
 
-type unitInfo struct {
-	props    units.Properties
-	statuses []core.ContainerStatus
+type unitStatus struct {
+	id     units.ID
+	props  units.Properties
+	status core.ContainerStatus
 }
 
-func (s *DbusState) listUnits(ctx context.Context) (map[units.Name]*unitInfo, error) {
+func (s *DbusState) listUnits(ctx context.Context) ([]*unitStatus, error) {
 	us, err := s.c.ListUnitsContext(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	unitInfos := make(map[units.Name]*unitInfo)
+	var ret []*unitStatus
 	for _, u := range us {
 		if !strings.HasPrefix(u.Name, units.Prefix) {
 			continue
@@ -119,27 +145,15 @@ func (s *DbusState) listUnits(ctx context.Context) (map[units.Name]*unitInfo, er
 			return nil, err
 		}
 
-		state := fromSubState(u.SubState, props)
-		status := units.ToContainerStatus(id.Container(), props, state)
-
-		info, ok := unitInfos[name]
-		if !ok {
-			info = &unitInfo{props: props}
-			unitInfos[name] = info
-		}
-		info.statuses = append(info.statuses, status)
+		ret = append(ret, &unitStatus{
+			id,
+			props,
+			units.ToContainerStatus(
+				id.Container(),
+				props,
+				toContainerState(u.SubState, props),
+			),
+		})
 	}
-
-	return unitInfos, nil
-}
-
-func (s *DbusState) Get(ctx context.Context, name units.Name) (*core.PodStatus, error) {
-	m, err := s.List(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if status, ok := m[name]; ok {
-		return status, nil
-	}
-	return nil, errdefs.NotFound(string(name))
+	return ret, nil
 }
