@@ -3,11 +3,11 @@ module github.com/anqur/unitlet
 go 1.20
 
 require (
-	github.com/coreos/go-systemd/v22 v22.3.2
+	github.com/coreos/go-systemd/v22 v22.5.0
 	github.com/sirupsen/logrus v1.9.0
 	github.com/virtual-kubelet/node-cli v0.8.0
 	github.com/virtual-kubelet/virtual-kubelet v1.7.0
-	k8s.io/api v0.25.0
+	k8s.io/api v0.26.2
 	k8s.io/apimachinery v0.26.2
 )
 
