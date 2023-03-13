@@ -12,7 +12,7 @@ import (
 	"github.com/anqur/unitlet/internal/logging"
 )
 
-const k8sVersion = "v1.26.2"
+const k8sVersion = "v1.19.10"
 
 var version, buildTime string
 

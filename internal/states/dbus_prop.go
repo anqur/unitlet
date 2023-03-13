@@ -115,10 +115,10 @@ func parseTimestampMilli(s string) time.Time {
 }
 
 func toContainerState(subState string, props units.Properties) (ret core.ContainerState) {
-	if strings.HasPrefix(subState, DbusTerminatedStop) ||
+	if finishedAt := props.FinishedAt(); strings.HasPrefix(subState, DbusTerminatedStop) ||
 		subState == DbusTerminatedFailed ||
 		subState == DbusTerminatedExited ||
-		(subState == DbusTerminatedDead && !props.FinishedAt().IsZero()) {
+		(subState == DbusTerminatedDead && !finishedAt.IsZero()) {
 		reason := string(core.PodSucceeded)
 		if props.ExitCode() != 0 {
 			reason = string(core.PodFailed)
@@ -128,7 +128,7 @@ func toContainerState(subState string, props units.Properties) (ret core.Contain
 			Reason:      reason,
 			Message:     reason,
 			StartedAt:   props.StartedAt(),
-			FinishedAt:  props.FinishedAt(),
+			FinishedAt:  finishedAt,
 			ContainerID: props.ContainerID().String(),
 		}
 		return
